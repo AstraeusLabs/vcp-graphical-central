@@ -1,0 +1,9 @@
+mainmenu "Bluetooth: Graphical VCP Central App"
+
+config BT_TARGET_DEVICE_NAME
+    string "Bluetooth target device name"
+    default ""
+    help
+      Specify the name of the target Bluetooth device to be scanned for and connected to.
+
+source "Kconfig.zephyr"
