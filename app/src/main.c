@@ -97,7 +97,7 @@ static void create_sliders(void)
 
         scr_y += dist;
 
-        vocs_slider[i] = lcd_create_slider(scr, VOCS_OFFSET_MIN, VOCS_OFFSET_MAX, 25, scr_y, vocs_slider_event_cb);
+        vocs_slider[i] = lcd_create_slider(scr, VOCS_OFFSET_MIN, VOCS_OFFSET_MAX, 10, scr_y, vocs_slider_event_cb);
         vocs_label[i] = lcd_create_label(scr, txt, -120, scr_y);
     }
 
@@ -107,7 +107,7 @@ static void create_sliders(void)
 
         scr_y += dist;
 
-        aics_slider[i] = lcd_create_slider(scr, AICS_GAIN_MIN, AICS_GAIN_MAX, 25, scr_y, aics_slider_event_cb);
+        aics_slider[i] = lcd_create_slider(scr, AICS_GAIN_MIN, AICS_GAIN_MAX, 10, scr_y, aics_slider_event_cb);
         aics_label[i] = lcd_create_label(scr, txt, -120, scr_y);
     }
 }
@@ -247,7 +247,7 @@ static void create_buttons_before_connecting(void)
     connect_btn = lcd_create_button(scr, "Connect", 100, 50, -60, -20, connect_btn_event_cb);
     scan_btn = lcd_create_button(scr, "Scan", 100, 50, 60, -20, scan_btn_event_cb);
 
-    msg_label = lcd_create_label(scr, "Not connected.", 0, 75);
+    msg_label = lcd_create_label(scr, "Not connected.", 0, 50);
     msg_label_created = true;
 }
 
@@ -257,10 +257,10 @@ static void create_buttons_after_connecting(void)
 
     clear_screen();
 
-    discover_btn = lcd_create_button(scr, "VCP Discover", 150, 50, 0, 0, discover_btn_event_cb);
-    disconnect_btn = lcd_create_button(scr, "Disconnect", 100, 30, -75, -75, disconnect_btn_event_cb);
+    discover_btn = lcd_create_button(scr, "VCP Discover", 160, 50, 0, 0, discover_btn_event_cb);
+    disconnect_btn = lcd_create_button(scr, "Disconnect", 120, 40, -75, -75, disconnect_btn_event_cb);
 
-    msg_label = lcd_create_label(scr, "Connected.", 0, 75);
+    msg_label = lcd_create_label(scr, "Connected.", 0, 70);
     msg_label_created = true;
 }
 

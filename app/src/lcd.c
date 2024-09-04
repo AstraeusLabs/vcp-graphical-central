@@ -49,11 +49,11 @@ static void lcd_slider_style_init(void)
 
     lv_style_init(&slider_style_knob);
     lv_style_set_bg_opa(&slider_style_knob, LV_OPA_COVER);
-    lv_style_set_bg_color(&slider_style_knob, lv_palette_main(LV_PALETTE_RED));
-    lv_style_set_border_color(&slider_style_knob, lv_palette_darken(LV_PALETTE_RED, 3));
-    lv_style_set_border_width(&slider_style_knob, 2);
+    lv_style_set_bg_color(&slider_style_knob, lv_palette_darken(LV_PALETTE_RED, 3));
+    lv_style_set_border_color(&slider_style_knob, lv_palette_darken(LV_PALETTE_RED, 5));
+    lv_style_set_border_width(&slider_style_knob, 1);
     lv_style_set_radius(&slider_style_knob, LV_RADIUS_CIRCLE);
-    lv_style_set_pad_all(&slider_style_knob, 6);
+    lv_style_set_pad_all(&slider_style_knob, 4);
     lv_style_set_transition(&slider_style_knob, &slider_trans_dsc);
 
     lv_style_init(&slider_style_pressed_color);
@@ -77,7 +77,7 @@ static void lcd_button_style_init(void)
     lv_style_set_outline_opa(&button_style, LV_OPA_COVER);
     lv_style_set_outline_color(&button_style, lv_palette_darken(LV_PALETTE_DEEP_PURPLE, 3));
 
-    lv_style_set_text_color(&button_style, lv_color_white());
+    lv_style_set_text_color(&button_style, lv_palette_main(LV_PALETTE_AMBER));
     lv_style_set_pad_all(&button_style, 10);
 
     lv_style_init(&button_style_pressed);
@@ -121,8 +121,8 @@ lv_obj_t *lcd_create_slider(lv_obj_t *parent, int16_t min_value, int16_t max_val
 
     lv_obj_center(slider);
 
-    lv_obj_set_width(slider, 200);
-    lv_obj_set_height(slider, 20);
+    lv_obj_set_width(slider, 175);
+    lv_obj_set_height(slider, 15);
     lv_obj_align(slider, LV_ALIGN_CENTER, x, y);
 
     lv_obj_add_event_cb(slider, cb, LV_EVENT_RELEASED, NULL);
