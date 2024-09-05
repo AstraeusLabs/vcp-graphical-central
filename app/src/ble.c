@@ -23,7 +23,7 @@
 
 
 static struct bt_vcp_vol_ctlr *vcp_vol_ctlr;
-static struct bt_conn *default_conn;
+static struct bt_conn *dev_conn;
 static bool scan_started = false;
 static bool connect_after_detection = false;
 static bt_addr_le_t pd_addr;
@@ -61,10 +61,10 @@ static int connect_to_device(const bt_addr_le_t *addr)
 	bt_addr_le_to_str(addr, addr_str, sizeof(addr_str));
 	printk("Connecting to %s...\n", addr_str);
 
-    int err = bt_conn_le_create(addr, BT_CONN_LE_CREATE_CONN, BT_LE_CONN_PARAM_DEFAULT, &default_conn);
+    int err = bt_conn_le_create(addr, BT_CONN_LE_CREATE_CONN, BT_LE_CONN_PARAM_DEFAULT, &dev_conn);
     if (err) {
         printk("Connection failed (err %d)\n", err);
-		bt_conn_unref(default_conn);
+		bt_conn_unref(dev_conn);
         return -1;
     }
 
@@ -84,12 +84,12 @@ int ble_connect(void)
 
 int ble_disconnect(void)
 {
-	if (default_conn == NULL) {
+	if (dev_conn == NULL) {
 		printk("No device connected!\n");
         return 1;
 	}
 
-    int err = bt_conn_disconnect(default_conn, BT_HCI_ERR_REMOTE_USER_TERM_CONN);
+    int err = bt_conn_disconnect(dev_conn, BT_HCI_ERR_REMOTE_USER_TERM_CONN);
     if (err) {
         printk("Failed to disconnect (err %d)\n", err);
         return -1;
@@ -207,12 +207,12 @@ int ble_vcp_discover(struct bt_vcp_vol_ctlr_cb *vcp_callbacks)
 		cb_registered = true;
 	}
 
-	if (default_conn == NULL) {
+	if (dev_conn == NULL) {
 		printk("Not connected!\n");
 		return -2;
 	}
 
-	result = bt_vcp_vol_ctlr_discover(default_conn, &vcp_vol_ctlr);
+	result = bt_vcp_vol_ctlr_discover(dev_conn, &vcp_vol_ctlr);
 	if (result != 0) {
 		printk("Fail: %d\n", result);
         return -3;

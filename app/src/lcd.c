@@ -30,6 +30,9 @@ static lv_style_transition_dsc_t button_trans_dsc;
 static lv_style_t button_style;
 static lv_style_t button_style_pressed;
 
+static lv_style_t voice_icon_style;
+static lv_style_t mute_icon_style;
+
 
 static void lcd_slider_style_init(void)
 {
@@ -92,6 +95,37 @@ static void lcd_button_style_init(void)
     lv_style_set_transition(&button_style_pressed, &button_trans_dsc);
 }
 
+static void lcd_common_voice_style_init(lv_style_t style)
+{
+    lv_style_init(&style);
+
+    lv_style_set_bg_opa(&style, LV_OPA_TRANSP);
+    lv_style_set_bg_color(&style, lv_color_white());
+    lv_style_set_bg_grad_color(&style, lv_color_white());
+    lv_style_set_bg_grad_dir(&style, LV_GRAD_DIR_NONE);
+
+    lv_style_set_border_opa(&style, LV_OPA_TRANSP);
+    lv_style_set_border_width(&style, 0);
+    lv_style_set_border_color(&style, lv_color_white());
+
+    lv_style_set_outline_opa(&style, LV_OPA_TRANSP);
+    lv_style_set_outline_color(&style, lv_color_white());
+
+    lv_style_set_pad_all(&style, 0);
+}
+
+static void lcd_voice_icon_style_init(void)
+{
+    lcd_common_voice_style_init(voice_icon_style);
+    lv_style_set_text_color(&voice_icon_style, lv_palette_darken(LV_PALETTE_GREEN, 4));
+}
+
+static void lcd_mute_icon_style_init(void)
+{
+    lcd_common_voice_style_init(mute_icon_style);
+    lv_style_set_text_color(&mute_icon_style, lv_palette_main(LV_PALETTE_RED));
+}
+
 int lcd_init(void)
 {
     lv_init();
@@ -104,6 +138,8 @@ int lcd_init(void)
     display_blanking_off(display_dev);
     lcd_slider_style_init();
     lcd_button_style_init();
+    lcd_voice_icon_style_init();
+    lcd_mute_icon_style_init();
 
     return 0;
 }
@@ -121,7 +157,7 @@ lv_obj_t *lcd_create_slider(lv_obj_t *parent, int16_t min_value, int16_t max_val
 
     lv_obj_center(slider);
 
-    lv_obj_set_width(slider, 175);
+    lv_obj_set_width(slider, 170);
     lv_obj_set_height(slider, 15);
     lv_obj_align(slider, LV_ALIGN_CENTER, x, y);
 
@@ -158,4 +194,54 @@ lv_obj_t *lcd_create_label(lv_obj_t *parent, const char *text, lv_coord_t x, lv_
     lv_obj_align(msg_label, LV_ALIGN_CENTER, x, y);
 
     return msg_label;
+}
+
+lv_obj_t *lcd_create_voice_icon(lv_obj_t *parent, lv_coord_t x, lv_coord_t y, lv_event_cb_t cb)
+{
+    lv_obj_t *icon = lv_btn_create(parent);
+    lv_obj_remove_style_all(icon);
+    lv_obj_add_style(icon, &voice_icon_style, LV_PART_MAIN);
+
+    lv_obj_set_size(icon, 30, 30);
+    lv_obj_align(icon, LV_ALIGN_CENTER, x, y);
+
+    lv_obj_add_event_cb(icon, cb, LV_EVENT_RELEASED, NULL);
+
+    lv_obj_t *label = lv_label_create(icon);
+    lv_label_set_text(label, LV_SYMBOL_VOLUME_MAX);
+    lv_obj_center(label);
+
+    return icon;
+}
+
+lv_obj_t *lcd_create_balance_icon(lv_obj_t *parent, lv_coord_t x, lv_coord_t y, lv_event_cb_t cb)
+{
+    lv_obj_t *icon = lv_btn_create(parent);
+    lv_obj_remove_style_all(icon);
+    lv_obj_add_style(icon, &voice_icon_style, LV_PART_MAIN);
+
+    lv_obj_set_size(icon, 30, 30);
+    lv_obj_align(icon, LV_ALIGN_CENTER, x, y);
+
+    lv_obj_add_event_cb(icon, cb, LV_EVENT_RELEASED, NULL);
+
+    lv_obj_t *label = lv_label_create(icon);
+//    lv_label_set_text(label, "L/R");
+    lv_label_set_text(label, LV_SYMBOL_LEFT LV_SYMBOL_RIGHT);
+    lv_obj_center(label);
+
+    return icon;
+}
+
+void lcd_change_voice_icon(lv_obj_t *icon, uint8_t mute)
+{
+    lv_obj_t *label = lv_obj_get_child(icon, 0);
+
+    if (mute) {
+        lv_obj_add_style(icon, &mute_icon_style, LV_PART_MAIN);
+        lv_label_set_text(label, LV_SYMBOL_VOLUME_MID);
+    } else {
+        lv_obj_add_style(icon, &voice_icon_style, LV_PART_MAIN);
+        lv_label_set_text(label, LV_SYMBOL_VOLUME_MAX);
+    }
 }

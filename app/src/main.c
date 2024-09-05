@@ -26,9 +26,15 @@
 static struct bt_vcp_included vcp_included;
 static bool target_device_detected = false;
 
+static int16_t vocs_offset[VCP_MAX_VOCS_INST] = {0};
+static int8_t aics_gain[VCP_MAX_AICS_INST] = {0};
+static uint8_t aics_mute[VCP_MAX_AICS_INST] = {0};
+
 static lv_obj_t *scr;
 static lv_obj_t *vocs_slider[VCP_MAX_VOCS_INST];
 static lv_obj_t *aics_slider[VCP_MAX_AICS_INST];
+static lv_obj_t *vocs_voice_icon[VCP_MAX_VOCS_INST];
+static lv_obj_t *aics_voice_icon[VCP_MAX_AICS_INST];
 static lv_obj_t *msg_label;
 static bool msg_label_created = false;
 
@@ -53,8 +59,9 @@ static void vocs_slider_event_cb(lv_event_t *e)
     lv_obj_t *slider = lv_event_get_target(e);
     int16_t value = lv_slider_get_value(slider);
     
-    for (uint8_t i = 0; i < VCP_MAX_VOCS_INST; i++) {
+    for (uint8_t i = 0; i < vcp_included.vocs_cnt; i++) {
         if(slider == vocs_slider[i]) {
+            vocs_offset[i] = value;
             printk("Set VOCS-%d offset = %d\n", i, value);
 
 	        int result = bt_vocs_state_set(vcp_included.vocs[i], value);
@@ -70,8 +77,9 @@ static void aics_slider_event_cb(lv_event_t *e)
     lv_obj_t *slider = lv_event_get_target(e);
     int16_t value = lv_slider_get_value(slider);
 
-    for (uint8_t i = 0; i < VCP_MAX_AICS_INST; i++) {
+    for (uint8_t i = 0; i < vcp_included.aics_cnt; i++) {
         if(slider == aics_slider[i]) {
+            aics_gain[i] = value;
             printk("Set AICS-%d gain = %d\n", i, value);
 
 	        int result = bt_aics_gain_set(vcp_included.aics[i], value);
@@ -80,6 +88,32 @@ static void aics_slider_event_cb(lv_event_t *e)
 	        } 
         }
     }    
+}
+
+static void aics_voice_icon_event_cb(lv_event_t *e)
+{
+    lv_obj_t *icon = lv_event_get_target(e);
+
+    for (uint8_t i = 0; i < vcp_included.aics_cnt; i++) {
+        if(icon == aics_voice_icon[i]) {
+            int result;
+
+            if(aics_mute[i]) {
+                aics_mute[i] = 0;
+	            result = bt_aics_unmute(vcp_included.aics[i]);
+                lcd_change_voice_icon(icon, aics_mute[i]);
+            } else {
+                aics_mute[i] = 1;
+	            result = bt_aics_mute(vcp_included.aics[i]);
+                lcd_change_voice_icon(icon, aics_mute[i]);
+            }
+
+            printk("Set AICS-%d mute = %d\n", i,  aics_mute[i]);
+	        if (result != 0) {
+		        printk("AICS mute set failed: %d\n", result);
+	        }
+        }
+    }
 }
 
 static void create_sliders(void)
@@ -91,7 +125,7 @@ static void create_sliders(void)
 
     clear_screen();
 
-    for (uint8_t i = 0; i < VCP_MAX_VOCS_INST; ++i) {
+    for (uint8_t i = 0; i < vcp_included.vocs_cnt; ++i) {
         char txt[10];
         snprintf(txt, sizeof(txt), "VOCS-%d", i);
 
@@ -99,9 +133,10 @@ static void create_sliders(void)
 
         vocs_slider[i] = lcd_create_slider(scr, VOCS_OFFSET_MIN, VOCS_OFFSET_MAX, 10, scr_y, vocs_slider_event_cb);
         vocs_label[i] = lcd_create_label(scr, txt, -120, scr_y);
+        vocs_voice_icon[i] = lcd_create_balance_icon(scr, 125, scr_y, NULL);
     }
 
-    for (uint8_t i = 0; i < VCP_MAX_AICS_INST; ++i) {
+    for (uint8_t i = 0; i < vcp_included.aics_cnt; ++i) {
         char txt[10];
         snprintf(txt, sizeof(txt), "AICS-%d", i);
 
@@ -109,6 +144,7 @@ static void create_sliders(void)
 
         aics_slider[i] = lcd_create_slider(scr, AICS_GAIN_MIN, AICS_GAIN_MAX, 10, scr_y, aics_slider_event_cb);
         aics_label[i] = lcd_create_label(scr, txt, -120, scr_y);
+        aics_voice_icon[i] = lcd_create_voice_icon(scr, 125, scr_y, aics_voice_icon_event_cb);
     }
 }
 
@@ -141,21 +177,6 @@ static void vcp_volume_state_cb(struct bt_vcp_vol_ctlr *vol_ctlr, int err, uint8
     printk("VCS volume = %u, mute = %u\n", volume, mute);
 }
 
-static void vcp_aics_state_cb(struct bt_aics *inst, int err, int8_t gain, uint8_t mute, uint8_t mode)
-{
-	if (err != 0) {
-		printk("AICS state get failed (%d) for inst %p\n", err, inst);
-        return;
-	}
-
-    for (uint8_t i=0; i < vcp_included.aics_cnt; ++i) {
-        if (vcp_included.aics[i] == inst) {
-            lv_slider_set_value(aics_slider[i], gain, LV_ANIM_OFF);
-            printk("AICS-%d gain = %d, mute = %u, mode = %u\n", i, gain, mute, mode);
-        }
-    }
-}
-
 static void vcp_vocs_state_cb(struct bt_vocs *inst, int err, int16_t offset)
 {
 	if (err != 0) {
@@ -165,8 +186,27 @@ static void vcp_vocs_state_cb(struct bt_vocs *inst, int err, int16_t offset)
 
     for (uint8_t i=0; i < vcp_included.vocs_cnt; ++i) {
         if (vcp_included.vocs[i] == inst) {
+            vocs_offset[i] = offset;
             lv_slider_set_value(vocs_slider[i], offset, LV_ANIM_OFF);
             printk("VOCS-%d offset = %d\n", i, offset);
+        }
+    }
+}
+
+static void vcp_aics_state_cb(struct bt_aics *inst, int err, int8_t gain, uint8_t mute, uint8_t mode)
+{
+	if (err != 0) {
+		printk("AICS state get failed (%d) for inst %p\n", err, inst);
+        return;
+	}
+
+    for (uint8_t i=0; i < vcp_included.aics_cnt; ++i) {
+        if (vcp_included.aics[i] == inst) {
+            aics_gain[i] = gain;
+            aics_mute[i] = mute;
+            lv_slider_set_value(aics_slider[i], gain, LV_ANIM_OFF);
+            lcd_change_voice_icon(aics_voice_icon[i], mute);
+            printk("AICS-%d gain = %d, mute = %u, mode = %u\n", i, gain, mute, mode);
         }
     }
 }
@@ -174,11 +214,11 @@ static void vcp_vocs_state_cb(struct bt_vocs *inst, int err, int16_t offset)
 static struct bt_vcp_vol_ctlr_cb vcp_cbs = {
 	.discover = vcp_discover_cb,
     .state = vcp_volume_state_cb,
-	.aics_cb = {
-		.state = vcp_aics_state_cb,
-	},
 	.vocs_cb = {
 		.state = vcp_vocs_state_cb,
+	},
+	.aics_cb = {
+		.state = vcp_aics_state_cb,
 	}
 };
 
@@ -325,6 +365,6 @@ int main(void)
 
 	while (1) {
         lv_task_handler();
-        k_sleep(K_MSEC(10));
+        k_sleep(K_MSEC(50));
 	}
 }
