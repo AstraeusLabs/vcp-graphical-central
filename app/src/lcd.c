@@ -33,6 +33,8 @@ static lv_style_t button_style_pressed;
 static lv_style_t voice_icon_style;
 static lv_style_t mute_icon_style;
 
+static bool msg_label_created = false;
+
 
 static void lcd_slider_style_init(void)
 {
@@ -144,6 +146,14 @@ int lcd_init(void)
     return 0;
 }
 
+void lcd_clear_screen(lv_obj_t *parent)
+{
+    msg_label_created = false;
+    k_sleep(K_MSEC(300));
+    lv_obj_clean(parent);
+    k_sleep(K_MSEC(300));
+}
+
 lv_obj_t *lcd_create_slider(lv_obj_t *parent, int16_t min_value, int16_t max_value, lv_coord_t x, lv_coord_t y, lv_event_cb_t cb)
 {
     lv_obj_t *slider = lv_slider_create(parent);
@@ -192,6 +202,8 @@ lv_obj_t *lcd_create_label(lv_obj_t *parent, const char *text, lv_coord_t x, lv_
     lv_obj_t *msg_label = lv_label_create(parent);
     lv_label_set_text(msg_label, text);
     lv_obj_align(msg_label, LV_ALIGN_CENTER, x, y);
+
+    msg_label_created = true;
 
     return msg_label;
 }
@@ -243,5 +255,12 @@ void lcd_change_voice_icon(lv_obj_t *icon, uint8_t mute)
     } else {
         lv_obj_add_style(icon, &voice_icon_style, LV_PART_MAIN);
         lv_label_set_text(label, LV_SYMBOL_VOLUME_MAX);
+    }
+}
+
+void lcd_display_message(lv_obj_t *lbl, const char *msg)
+{
+    if(msg_label_created) {
+        lv_label_set_text(lbl, msg);
     }
 }
