@@ -238,8 +238,7 @@ lv_obj_t *lcd_create_balance_icon(lv_obj_t *parent, lv_coord_t x, lv_coord_t y, 
     lv_obj_add_event_cb(icon, cb, LV_EVENT_RELEASED, NULL);
 
     lv_obj_t *label = lv_label_create(icon);
-//    lv_label_set_text(label, "L/R");
-    lv_label_set_text(label, LV_SYMBOL_LEFT LV_SYMBOL_RIGHT);
+    lv_label_set_text(label, "L/R");
     lv_obj_center(label);
 
     return icon;

@@ -7,19 +7,22 @@
 #include <errno.h>
 #include <stdlib.h>
 #include <string.h>
-#include <strings.h>
 #include <lvgl.h>
 #include <zephyr/kernel.h>
 #include <zephyr/sys/printk.h>
-#include <zephyr/device.h>
-#include <zephyr/drivers/display.h>
 
 #include "lcd.h"
 #include "ble.h"
 
 
-static bool target_device_detected = false;
-static uint8_t vocs_count = 1, aics_count = 3;
+static bool target_device_connected[BLE_CONN_CNT] = { false };
+static bool target_device_vcp_discovered[BLE_CONN_CNT] = { false };
+static bool connect_all_targets = false;
+static bool vcp_discover_all_targets = false;
+static bool all_devices_detected = false;
+static uint8_t device_found_count = 0;
+static uint8_t aics_inst_cnt[VCP_MAX_AICS_INST] = { 0 };
+static uint8_t vocs_inst_cnt[VCP_MAX_VOCS_INST] = { 0 };
 static uint8_t aics_mute[VCP_MAX_AICS_INST] = { 0 };
 static int8_t aics_gain[VCP_MAX_AICS_INST] = { 0 };
 static int16_t vocs_offset[VCP_MAX_VOCS_INST] = { 0 };
@@ -36,11 +39,12 @@ static void vocs_slider_event_cb(lv_event_t *e)
 {
     lv_obj_t *slider = lv_event_get_target(e);
     int16_t value = lv_slider_get_value(slider);
-    
-    for (uint8_t i = 0; i < vocs_count; i++) {
+
+    for (uint8_t i = 0; i < VCP_MAX_VOCS_INST; i++) {
         if(slider == vocs_slider[i]) {
             vocs_offset[i] = value;
-	        ble_update_vocs_offset(i, value);
+	        ble_update_vocs_offset(conn_rshi, i, value);
+	        ble_update_vocs_offset(conn_lshi, i, -value);
         }
     }    
 }
@@ -50,10 +54,11 @@ static void aics_slider_event_cb(lv_event_t *e)
     lv_obj_t *slider = lv_event_get_target(e);
     int16_t value = lv_slider_get_value(slider);
 
-    for (uint8_t i = 0; i < aics_count; i++) {
+    for (uint8_t i = 0; i < VCP_MAX_AICS_INST; i++) {
         if(slider == aics_slider[i]) {
             aics_gain[i] = value;
-	        ble_update_aics_gain(i, value);
+	        ble_update_aics_gain(conn_rshi, i, value);
+	        ble_update_aics_gain(conn_lshi, i, value);
         }
     }    
 }
@@ -62,10 +67,11 @@ static void aics_voice_icon_event_cb(lv_event_t *e)
 {
     lv_obj_t *icon = lv_event_get_target(e);
 
-    for (uint8_t i = 0; i < aics_count; i++) {
+    for (uint8_t i = 0; i < VCP_MAX_AICS_INST; i++) {
         if(icon == aics_voice_icon[i]) {
             aics_mute[i] = !aics_mute[i];
-            ble_update_aics_mute(i, aics_mute[i]);
+            ble_update_aics_mute(conn_rshi, i, aics_mute[i]);
+            ble_update_aics_mute(conn_lshi, i, aics_mute[i]);
             lcd_change_voice_icon(icon, aics_mute[i]);
         }
     }
@@ -80,7 +86,7 @@ static void create_sliders(void)
 
     lcd_clear_screen(scr);
 
-    for (uint8_t i = 0; i < vocs_count; ++i) {
+    for (uint8_t i = 0; i < VCP_MAX_VOCS_INST; ++i) {
         char txt[10];
         snprintf(txt, sizeof(txt), "VOCS-%d", i);
 
@@ -91,7 +97,7 @@ static void create_sliders(void)
         vocs_voice_icon[i] = lcd_create_balance_icon(scr, 125, scr_y, NULL);
     }
 
-    for (uint8_t i = 0; i < aics_count; ++i) {
+    for (uint8_t i = 0; i < VCP_MAX_AICS_INST; ++i) {
         char txt[10];
         snprintf(txt, sizeof(txt), "AICS-%d", i);
 
@@ -105,10 +111,12 @@ static void create_sliders(void)
 
 static void scan_btn_event_cb(lv_event_t *e)
 {
-    target_device_detected = false;
+    connect_all_targets = false;
+    all_devices_detected = false;
+    device_found_count = 0;
 
-    int err = ble_start_scan(scan_only);
-    if (err) {
+    int err = ble_start_scan();
+    if (err < 0) {
         lcd_display_message(msg_label, "Start scanning failed!");
         return;
     }        
@@ -117,18 +125,19 @@ static void scan_btn_event_cb(lv_event_t *e)
 }
 
 static void connect_btn_event_cb(lv_event_t *e)
-{
-    int err;
-
+{ 
+    connect_all_targets = true;
     lcd_display_message(msg_label, "Connecting...");
 
-    if (target_device_detected) {
-        err = ble_connect();
+    if (all_devices_detected) {
+        uint8_t first_conn_idx = 0;
+        int err = ble_connect(first_conn_idx);
         if (err) {
             lcd_display_message(msg_label, "Connection failed!");
         }
     } else {
-        err = ble_start_scan(scan_connect);
+        device_found_count = 0;
+        int err = ble_start_scan_force();
         if (err) {
             lcd_display_message(msg_label, "Start scanning failed!");
         }
@@ -137,21 +146,38 @@ static void connect_btn_event_cb(lv_event_t *e)
 
 static void discover_btn_event_cb(lv_event_t *e)
 {
-     int err = ble_vcp_discover();
-     if (err) {
-        lcd_display_message(msg_label, "VCP discover failed!");
+    for (uint8_t i = 0; i < BLE_CONN_CNT; i++) {
+        target_device_vcp_discovered[i] = false;
+    }
+
+    vcp_discover_all_targets = true;
+    uint8_t first_conn_idx = 0;
+    int err = ble_vcp_discover(first_conn_idx);
+    if (err) {
+        char txt[50];    
+        snprintf(txt, sizeof(txt), "Connection %d: VCP discover failed!", first_conn_idx);
+        lcd_display_message(msg_label, txt);
         return;
-     }
+    }
 
     lcd_display_message(msg_label, "Start discovering VCP...");
 }
 
 static void disconnect_btn_event_cb(lv_event_t *e)
 {  
-    int err = ble_disconnect();
-    if (err) {
-        lcd_display_message(msg_label, "Failed to disconnect!");
-	}
+    for (uint8_t i = 0; i < BLE_CONN_CNT; i++) {
+        if (target_device_connected[i]) {
+            int err = ble_disconnect(i);
+            if (err) {
+                char txt[50];    
+                snprintf(txt, sizeof(txt), "Connection %d: failed to disconnect!", i);
+                lcd_display_message(msg_label, txt);
+            }
+        }
+    }
+
+    connect_all_targets = false;
+    vcp_discover_all_targets = false;
 }
 
 static void create_buttons_before_connecting(void)
@@ -178,27 +204,113 @@ static void create_buttons_after_connecting(void)
     msg_label = lcd_create_label(scr, "Connected.", 0, 70);
 }
 
-static void scan_device_status(status_t dev_st, const char *dev_name)
+static void create_buttons(conn_status_t all_conn)
 {
-    if (dev_st == status_available) {
-        char txt[MAX_DEVICE_NAME_LEN + 20];    
-        snprintf(txt, sizeof(txt), "Found device: %s\n", dev_name);
-        lcd_display_message(msg_label, txt);
+    static bool buttons_before_connecting_created = false;
+    static bool buttons_after_connecting_created = false;
 
-        target_device_detected = true;
+    if (all_conn != conn_connected) {
+        if (!buttons_before_connecting_created) {
+            create_buttons_before_connecting();
+            buttons_before_connecting_created = true;
+            buttons_after_connecting_created = false;
+        }
     } else {
-        printk("No device found!\n");
-        lcd_display_message(msg_label, "No device found!");
+        if(!buttons_after_connecting_created) {
+            create_buttons_after_connecting();
+            buttons_before_connecting_created = false;
+            buttons_after_connecting_created = true;
+        }
     }
 }
 
-static void device_connection_status(status_t conn_st)
+static void scan_device_status(scan_status_t scan_st, const char *dev_name)
 {
-    if (conn_st == status_available) {
-        create_buttons_after_connecting();
-    } else {
-        create_buttons_before_connecting();
+    switch (scan_st) {
+    case scan_available:
+        device_found_count++;
+        char txt[MAX_DEVICE_NAME_LEN + 20];    
+        snprintf(txt, sizeof(txt), "Found device: %s", dev_name);
+        lcd_display_message(msg_label, txt);
+        break;
+    case scan_done:
+        if(device_found_count < BLE_CONN_CNT) {
+            printk("Scan stopped before finding all target devices!\n");
+            return;
+        }
+
+        all_devices_detected = true;
+        printk("All devices found.\n");
+        lcd_display_message(msg_label, "All devices found.");
+
+        if (connect_all_targets) {
+            lcd_display_message(msg_label, "Connecting...");
+
+            uint8_t first_conn_idx = 0;
+            int err = ble_connect(first_conn_idx);
+            if (err) {
+                lcd_display_message(msg_label, "Connection failed!");
+            }
+        }
+        break;
+    case scan_timeout:
+        printk("Some devices not found!\n");
+        lcd_display_message(msg_label, "Scan timeout!\nSome devices not found!");
+        break;
+    default:
+        printk("Unknown scan status!\n");
+        break;
     }
+}
+
+static void device_connection_status(uint8_t conn_idx, conn_status_t conn_st)
+{
+    if (conn_idx >= BLE_CONN_CNT) {
+        printk("Connection index is not valid!\n");
+        return;
+    }
+
+    switch (conn_st) {
+    case conn_connected:
+        target_device_connected[conn_idx] = true;
+        printk("Device %d connected successfully.\n", conn_idx);
+
+        if (connect_all_targets) {
+            uint8_t next_conn = conn_idx + 1;
+            if (next_conn < BLE_CONN_CNT) {
+                if(!target_device_connected[next_conn]) {
+                    int err = ble_connect(next_conn);
+                    if (err) {
+                        char txt[50];    
+                        snprintf(txt, sizeof(txt), "Connection %d: failed!", next_conn);
+                        lcd_display_message(msg_label, txt);
+                        return;
+                    }
+                }
+            }
+        }
+        break;
+    case conn_disconnected:
+        target_device_connected[conn_idx] = false;
+        connect_all_targets = false;
+
+        printk("Device %d disconnected successfully.\n", conn_idx);
+        create_buttons(conn_disconnected);
+        break;
+    default:
+        printk("Connection status value is not valid!\n");
+        return;
+    }
+
+    for (uint8_t i = 0; i < BLE_CONN_CNT; i++) {
+        if (!target_device_connected[i]) {
+            return;
+        }
+    }
+
+    connect_all_targets = false;
+    printk("All devices connected successfully.\n");
+    create_buttons(conn_connected);
 }
 
 static void vcp_status(vcp_type_t cb_type, void *vcp_user_data)
@@ -207,27 +319,71 @@ static void vcp_status(vcp_type_t cb_type, void *vcp_user_data)
     case vcp_discover:
         vcp_discover_t *discover_data = (vcp_discover_t *)vcp_user_data;
 
-        vocs_count = discover_data->vocs_count;
-        aics_count = discover_data->aics_count;
+        if (discover_data->conn_idx >= BLE_CONN_CNT) {
+            printk("Connection index is not valid!\n");
+            return;            
+        }
 
-        printk("VCP discovered successfully (no. of VOCS inst. = %d, no. of AICS inst. = %d\n", vocs_count, aics_count);
+        if (discover_data->err != 0) {
+            printk("Connection %d: VCP discover get failed (%d)!\n", discover_data->conn_idx, discover_data->err);
+            return;
+        }
+
+        vocs_inst_cnt[discover_data->conn_idx] = discover_data->vocs_count;
+        aics_inst_cnt[discover_data->conn_idx] = discover_data->aics_count;
+
+        target_device_vcp_discovered[discover_data->conn_idx] = true;
+        printk("Connection %d: VCP discovered successfully\n", discover_data->conn_idx);
+
+        if (vcp_discover_all_targets) {
+            uint8_t next_conn = discover_data->conn_idx + 1;
+            if (next_conn < BLE_CONN_CNT) {
+                if(!target_device_vcp_discovered[next_conn]) {
+                    int err = ble_vcp_discover(next_conn);
+                    if (err) {
+                        char txt[50];    
+                        snprintf(txt, sizeof(txt), "Connection %d: VCP discover failed!", next_conn);
+                        lcd_display_message(msg_label, txt);
+                        return;
+                    }
+                }
+            }
+        }
+
+        for (uint8_t i = 0; i < BLE_CONN_CNT; i++) {
+            if (!target_device_vcp_discovered[i]) {
+                return;
+            }
+        }
+
+        printk("VCP discovered for all devices successfully.\n");
         create_sliders();
         break;
     case vcp_vcs_vol_state:
         vcp_volume_state_t *vcs_state = (vcp_volume_state_t *)vcp_user_data;
+
+        if (vcs_state->conn_idx >= BLE_CONN_CNT) {
+            printk("Connection index is not valid!\n");
+            return;            
+        }
 
         if (vcs_state->err != 0) {
             printk("VOCS state get failed (%d)\n", vcs_state->err);
             return;
         }
 
-        printk("VCS volume = %u, mute = %u\n", vcs_state->volume, vcs_state->mute);
+        printk("Connection %d: VCS volume = %u, mute = %u\n", vcs_state->conn_idx, vcs_state->volume, vcs_state->mute);
         break;
     case vcp_vocs_state:
         vcp_vocs_state_t *vocs_state = (vcp_vocs_state_t *)vcp_user_data;
 
-        if (vocs_state->inst_idx >= vocs_count) {
-            printk("VOCS inst. index (%d) is not valid!\n", vocs_state->inst_idx);
+        if (vocs_state->conn_idx >= BLE_CONN_CNT) {
+            printk("Connection index is not valid!\n");
+            return;            
+        }
+
+        if (vocs_state->inst_idx >= vocs_inst_cnt[vocs_state->conn_idx]) {
+            printk("VOCS inst. index is not valid!\n");
             return;
         }
 
@@ -236,14 +392,21 @@ static void vcp_status(vcp_type_t cb_type, void *vcp_user_data)
             return;
         }
 
-        printk("VOCS-%d offset = %d\n", vocs_state->inst_idx, vocs_state->offset);
-        lv_slider_set_value(vocs_slider[vocs_state->inst_idx], vocs_state->offset, LV_ANIM_OFF);
+        printk("Connection %d: VOCS-%d offset = %d\n", vocs_state->conn_idx, vocs_state->inst_idx, vocs_state->offset);
+
+        vocs_offset[vocs_state->inst_idx] = (vocs_state->conn_idx == conn_lshi) ? -vocs_state->offset : vocs_state->offset;
+        lv_slider_set_value(vocs_slider[vocs_state->inst_idx], vocs_offset[vocs_state->inst_idx], LV_ANIM_OFF);
         break;
     case vcp_aics_state:
         vcp_aics_state_t *aics_state = (vcp_aics_state_t *)vcp_user_data;
 
-        if (aics_state->inst_idx >= aics_count) {
-            printk("AICS inst. index (%d) is not valid!\n", aics_state->inst_idx);
+        if (aics_state->conn_idx >= BLE_CONN_CNT) {
+            printk("Connection index is not valid!\n");
+            return;            
+        }
+
+        if (aics_state->inst_idx >= aics_inst_cnt[aics_state->conn_idx]) {
+            printk("AICS inst. index is not valid!\n");
             return;
         }
 
@@ -252,7 +415,8 @@ static void vcp_status(vcp_type_t cb_type, void *vcp_user_data)
             return;
         }
 
-        printk("AICS-%d gain = %d, mute = %u, mode = %u\n", aics_state->inst_idx, aics_state->gain, aics_state->mute, aics_state->mode);
+        printk("Connection %d: AICS-%d gain = %d, mute = %u, mode = %u\n", aics_state->conn_idx, aics_state->inst_idx, aics_state->gain, aics_state->mute, aics_state->mode);
+    
         lv_slider_set_value(aics_slider[aics_state->inst_idx], aics_state->gain, LV_ANIM_OFF);
         lcd_change_voice_icon(aics_voice_icon[aics_state->inst_idx], aics_state->mute);
         break;
@@ -297,7 +461,7 @@ int main(void)
 	}
     printk("Display initialized.\n");
 
-    create_buttons_before_connecting();
+    create_buttons(conn_disconnected);
 
 	while (1) {
         lv_task_handler();

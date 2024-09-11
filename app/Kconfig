@@ -1,9 +1,29 @@
 mainmenu "Bluetooth: Graphical VCP Central App"
 
+config BT_TARGET_DEVICE_NUMBER
+    int "Number of Bluetooth target devices"
+    default 1
+    help
+      Specify the number of the target Bluetooth devices to be scanned for and connected to.
+
 config BT_TARGET_DEVICE_NAME
     string "Bluetooth target device name"
     default ""
     help
       Specify the name of the target Bluetooth device to be scanned for and connected to.
+
+config BT_TARGET_RSHI_DEVICE_NAME
+    string "Bluetooth target right side stereo hearing instrument device name"
+    default ""
+    help
+      Specify the name of the target Bluetooth right side stereo hearing instrument device
+      to be scanned for and connected to.
+
+config BT_TARGET_LSHI_DEVICE_NAME
+    string "Bluetooth target left side stereo hearing instrument device name"
+    default ""
+    help
+      Specify the name of the target Bluetooth left side stereo hearing instrument device
+      to be scanned for and connected to.
 
 source "Kconfig.zephyr"
