@@ -43,8 +43,13 @@ static void vocs_slider_event_cb(lv_event_t *e)
     for (uint8_t i = 0; i < VCP_MAX_VOCS_INST; i++) {
         if(slider == vocs_slider[i]) {
             vocs_offset[i] = value;
+
+#if (BLE_CONN_CNT == 1)
+	        ble_update_vocs_offset(conn_tgt, i, value);
+#elif (BLE_CONN_CNT == 2)
 	        ble_update_vocs_offset(conn_rshi, i, value);
 	        ble_update_vocs_offset(conn_lshi, i, -value);
+#endif
         }
     }    
 }
@@ -57,9 +62,14 @@ static void aics_slider_event_cb(lv_event_t *e)
     for (uint8_t i = 0; i < VCP_MAX_AICS_INST; i++) {
         if(slider == aics_slider[i]) {
             aics_gain[i] = value;
+
+#if (BLE_CONN_CNT == 1)
+	        ble_update_aics_gain(conn_tgt, i, value);
+#elif (BLE_CONN_CNT == 2)
 	        ble_update_aics_gain(conn_rshi, i, value);
 	        ble_update_aics_gain(conn_lshi, i, value);
-        }
+#endif
+       }
     }    
 }
 
@@ -70,8 +80,13 @@ static void aics_voice_icon_event_cb(lv_event_t *e)
     for (uint8_t i = 0; i < VCP_MAX_AICS_INST; i++) {
         if(icon == aics_voice_icon[i]) {
             aics_mute[i] = !aics_mute[i];
+
+#if (BLE_CONN_CNT == 1)
+	        ble_update_aics_mute(conn_tgt, i, aics_mute[i]);
+#elif (BLE_CONN_CNT == 2)
             ble_update_aics_mute(conn_rshi, i, aics_mute[i]);
             ble_update_aics_mute(conn_lshi, i, aics_mute[i]);
+#endif
             lcd_change_voice_icon(icon, aics_mute[i]);
         }
     }
@@ -394,7 +409,11 @@ static void vcp_status(vcp_type_t cb_type, void *vcp_user_data)
 
         printk("Connection %d: VOCS-%d offset = %d\n", vocs_state->conn_idx, vocs_state->inst_idx, vocs_state->offset);
 
+#if (BLE_CONN_CNT == 1)
+        vocs_offset[vocs_state->inst_idx] = vocs_state->offset;
+#elif (BLE_CONN_CNT == 2)
         vocs_offset[vocs_state->inst_idx] = (vocs_state->conn_idx == conn_lshi) ? -vocs_state->offset : vocs_state->offset;
+#endif
         lv_slider_set_value(vocs_slider[vocs_state->inst_idx], vocs_offset[vocs_state->inst_idx], LV_ANIM_OFF);
         break;
     case vcp_aics_state:
