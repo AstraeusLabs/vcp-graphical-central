@@ -57,7 +57,7 @@ typedef struct
     int err;
     uint8_t volume;
     uint8_t mute;
-} vcp_volume_state_t;
+} vcp_vol_state_t;
 
 typedef struct
 {
@@ -87,12 +87,13 @@ enum
 };
 
 
-typedef void (scan_status_callback_t) (scan_status_t scan_st, const char *dev_name);
-typedef void (conn_status_callback_t) (uint8_t conn_idx, conn_status_t conn_st);
-typedef void (vcp_status_callback_t) (vcp_type_t cb_type, void *vcp_user_data);
+typedef void (scan_status_callback_t) (scan_status_t scan_st,
+                                       const char *dev_name);
+typedef void (conn_status_callback_t) (uint8_t conn_idx,
+                                       conn_status_t conn_st);
+typedef void (vcp_status_callback_t) (vcp_type_t cb_type,
+                                      void *vcp_user_data);
 
-
-bool is_substring(const char *substr, const char *str);
 
 int ble_bt_init(void);
 int ble_start_scan(void);
@@ -100,9 +101,13 @@ int ble_start_scan_force(void);
 int ble_connect(uint8_t conn_idx);
 int ble_disconnect(uint8_t conn_idx);
 int ble_vcp_discover(uint8_t conn_idx);
-int ble_update_vocs_offset(uint8_t conn_idx, uint8_t inst_idx, int16_t offset);
-int ble_update_aics_gain(uint8_t conn_idx, uint8_t inst_idx, int8_t gain);
-int ble_update_aics_mute(uint8_t conn_idx, uint8_t inst_idx, uint8_t mute);
+int ble_update_vocs_offset(uint8_t conn_idx, uint8_t inst_idx,
+                           int16_t offset);
+int ble_update_aics_gain(uint8_t conn_idx, uint8_t inst_idx,
+                         int8_t gain);
+int ble_update_aics_mute(uint8_t conn_idx, uint8_t inst_idx,
+                         uint8_t mute);
+
 void ble_scan_status_cb_register(scan_status_callback_t *scan_status_cb);
 void ble_conn_status_cb_register(conn_status_callback_t *conn_status_cb);
 void ble_vcp_status_cb_register(vcp_status_callback_t *vcp_status_cb);
