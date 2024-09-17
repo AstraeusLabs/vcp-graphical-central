@@ -15,6 +15,8 @@
 #define VCP_MAX_VOCS_INST       CONFIG_BT_VCP_VOL_CTLR_MAX_VOCS_INST
 #define VCP_MAX_AICS_INST       CONFIG_BT_VCP_VOL_CTLR_MAX_AICS_INST
 
+#define VOLUME_MAX              255
+#define VOLUME_MIN              0
 #define VOCS_OFFSET_MAX         255
 #define VOCS_OFFSET_MIN         -255
 #define AICS_GAIN_MAX           127
@@ -101,6 +103,8 @@ int ble_start_scan_force(void);
 int ble_connect(uint8_t conn_idx);
 int ble_disconnect(uint8_t conn_idx);
 int ble_vcp_discover(uint8_t conn_idx);
+int ble_update_volume(uint8_t conn_idx, uint8_t volume);
+int ble_update_volume_mute(uint8_t conn_idx, uint8_t mute);
 int ble_update_vocs_offset(uint8_t conn_idx, uint8_t inst_idx,
                            int16_t offset);
 int ble_update_aics_gain(uint8_t conn_idx, uint8_t inst_idx,

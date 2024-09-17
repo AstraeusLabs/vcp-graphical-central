@@ -155,12 +155,12 @@ int lcd_init(void)
 {
     lv_init();
 
-	const struct device *display_dev =
+    const struct device *display_dev =
                             DEVICE_DT_GET(DT_CHOSEN(zephyr_display));
 
-	if (!device_is_ready(display_dev)) {
-		return -1;
-	}
+    if (!device_is_ready(display_dev)) {
+        return -1;
+    }
 
     display_blanking_off(display_dev);
     lcd_slider_style_init();

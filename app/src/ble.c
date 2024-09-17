@@ -40,6 +40,7 @@ static struct bt_vcp_vol_ctlr *vcp_vol_ctlr[BLE_CONN_CNT];
 static struct bt_vcp_included vcp_included[BLE_CONN_CNT];
 
 static bool ble_dev_found[BLE_CONN_CNT] = { false };
+static bool ble_dev_connected[BLE_CONN_CNT] = { false };
 static bt_addr_le_t pd_addr[BLE_CONN_CNT];
 const char *dev_name[BLE_CONN_CNT] = INIT_DEV_NAME;
 static bool scan_started = false;
@@ -95,7 +96,7 @@ static void scan_recv_cb(const struct bt_le_scan_recv_info *info,
     }
 
     for (int i = 0; i < BLE_CONN_CNT; i++) {
-        if(!ble_dev_found[i]) {
+        if(!ble_dev_found[i] && !ble_dev_connected[i]) {
             return;
         }
     }
@@ -103,22 +104,21 @@ static void scan_recv_cb(const struct bt_le_scan_recv_info *info,
     int err = bt_le_scan_stop();
     if (err) {
         printk("Failed to stop scan: %d\n", err);
+    } else {
+        printk("Scan stopped.\n");
     }
 
     scan_started = false;
-    printk("Scan stopped.\n");
 
     if (user_scan_status_cb) {
         user_scan_status_cb(scan_done, NULL);
     }
-
 }
 
 static void scan_timeout_cb(void)
 {
-    printk("Scan timeout!\n");
-
     scan_started = false;
+    printk("Scan timeout!\n");
 
     if (user_scan_status_cb) {
         user_scan_status_cb(scan_timeout ,NULL);
@@ -165,13 +165,12 @@ int ble_start_scan(void)
 int ble_start_scan_force(void)
 {
     if (scan_started) {
+        scan_started = false;
         int err = bt_le_scan_stop();
         if (err) {
             printk("Failed to stop scan: %d\n", err);
             return -1;
         }
-
-        scan_started = false;
     }
 
     return ble_start_scan();
@@ -179,10 +178,10 @@ int ble_start_scan_force(void)
 
 static int connect_to_device(uint8_t conn_idx)
 {
-	char addr_str[BT_ADDR_LE_STR_LEN];
+    char addr_str[BT_ADDR_LE_STR_LEN];
 
-	bt_addr_le_to_str(&pd_addr[conn_idx], addr_str, sizeof(addr_str));
-	printk("Connecting to connection %d (name: %s, addr: %s)...\n",
+    bt_addr_le_to_str(&pd_addr[conn_idx], addr_str, sizeof(addr_str));
+    printk("Connecting to connection %d (name: %s, addr: %s)...\n",
            conn_idx, dev_name[conn_idx], addr_str);
 
     int err = bt_conn_le_create(&pd_addr[conn_idx],
@@ -199,6 +198,11 @@ static int connect_to_device(uint8_t conn_idx)
 
 int ble_connect(uint8_t conn_idx)
 {
+    if (ble_dev_connected[conn_idx]) {
+        printk("Connection %d: already connected!\n", conn_idx);
+        return 1;
+    }
+
     if (scan_started) {
         int err = bt_le_scan_stop();
         if (err) {
@@ -214,10 +218,10 @@ int ble_connect(uint8_t conn_idx)
 
 int ble_disconnect(uint8_t conn_idx)
 {
-	if (ble_conn[conn_idx] == NULL) {
-		printk("Connection %d: no connection available!\n", conn_idx);
+    if (!ble_dev_connected[conn_idx] || (ble_conn[conn_idx] == NULL)) {
+        printk("Connection %d: no connection available!\n", conn_idx);
         return 1;
-	}
+    }
 
     int err = bt_conn_disconnect(ble_conn[conn_idx],
                                  BT_HCI_ERR_REMOTE_USER_TERM_CONN);
@@ -365,7 +369,52 @@ int ble_vcp_discover(uint8_t conn_idx)
         return -3;
     }
 
-	return 0;
+    return 0;
+}
+
+int ble_update_volume(uint8_t conn_idx, uint8_t volume)
+{
+    int result;
+
+    if (ble_conn[conn_idx] == NULL) {
+        printk("Connection %d: not connected!\n", conn_idx);
+        return -2;
+    }
+
+    result = bt_vcp_vol_ctlr_set_vol(vcp_vol_ctlr[conn_idx], volume);
+
+    if (result != 0) {
+        printk("Connection %d: volume set failed: %d\n",
+               conn_idx, result);
+        return -1;
+    }
+
+    return 0;
+}
+
+int ble_update_volume_mute(uint8_t conn_idx, uint8_t mute)
+{
+    int result;
+
+    if (ble_conn[conn_idx] == NULL) {
+        printk("Connection %d: not connected!\n", conn_idx);
+        return -2;
+    }
+
+    if (mute) {
+        result = bt_vcp_vol_ctlr_mute(vcp_vol_ctlr[conn_idx]);
+
+    } else {
+        result = bt_vcp_vol_ctlr_unmute(vcp_vol_ctlr[conn_idx]);
+    }
+
+    if (result != 0) {
+        printk("Connection %d: volume mute/unmute set failed: %d\n",
+               conn_idx, result);
+        return -1;
+    }
+
+    return 0;
 }
 
 int ble_update_vocs_offset(uint8_t conn_idx, uint8_t inst_idx,
@@ -431,7 +480,7 @@ int ble_update_aics_mute(uint8_t conn_idx, uint8_t inst_idx,
     }
 
     if (result != 0) {
-        printk("Connection %d: AICS mute set failed: %d\n",
+        printk("Connection %d: AICS mute/unmute set failed: %d\n",
                conn_idx, result);
         return -1;
     }
@@ -460,6 +509,7 @@ static void connected(struct bt_conn *conn, uint8_t conn_err)
         return;
     }
 
+    ble_dev_connected[conn_idx] = true;
     printk("Connection %d: connected.\n", conn_idx);
 
     if (user_conn_status_cb) {
@@ -481,6 +531,7 @@ static void disconnected(struct bt_conn *conn, uint8_t reason)
         return;
     }
 
+    ble_dev_connected[conn_idx] = false;
     printk("Connection %d: disconnected (reason %u)\n",
            conn_idx,reason);
     bt_conn_unref(ble_conn[conn_idx]);
