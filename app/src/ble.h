@@ -7,7 +7,6 @@
 #ifndef __BLE_H
 #define __BLE_H
 
-#define SCAN_TIMEOUT_SEC        10
 #define MAX_DEVICE_NAME_LEN     32
 
 #define BLE_CONN_CNT            CONFIG_BT_TARGET_DEVICE_NUMBER
@@ -89,15 +88,13 @@ enum
 };
 
 
-typedef void (scan_status_callback_t) (scan_status_t scan_st,
-                                       const char *dev_name);
-typedef void (conn_status_callback_t) (uint8_t conn_idx,
-                                       conn_status_t conn_st);
-typedef void (vcp_status_callback_t) (vcp_type_t cb_type,
-                                      void *vcp_user_data);
+typedef void (scan_status_callback_t) (scan_status_t scan_st, const char *dev_name);
+typedef void (conn_status_callback_t) (uint8_t conn_idx, conn_status_t conn_st);
+typedef void (vcp_status_callback_t) (vcp_type_t cb_type, void *vcp_user_data);
 
 
 int ble_bt_init(void);
+int ble_stop_scan(void);
 int ble_start_scan(void);
 int ble_start_scan_force(void);
 int ble_connect(uint8_t conn_idx);
@@ -105,12 +102,9 @@ int ble_disconnect(uint8_t conn_idx);
 int ble_vcp_discover(uint8_t conn_idx);
 int ble_update_volume(uint8_t conn_idx, uint8_t volume);
 int ble_update_volume_mute(uint8_t conn_idx, uint8_t mute);
-int ble_update_vocs_offset(uint8_t conn_idx, uint8_t inst_idx,
-                           int16_t offset);
-int ble_update_aics_gain(uint8_t conn_idx, uint8_t inst_idx,
-                         int8_t gain);
-int ble_update_aics_mute(uint8_t conn_idx, uint8_t inst_idx,
-                         uint8_t mute);
+int ble_update_vocs_offset(uint8_t conn_idx, uint8_t inst_idx, int16_t offset);
+int ble_update_aics_gain(uint8_t conn_idx, uint8_t inst_idx, int8_t gain);
+int ble_update_aics_mute(uint8_t conn_idx, uint8_t inst_idx, uint8_t mute);
 
 void ble_scan_status_cb_register(scan_status_callback_t *scan_status_cb);
 void ble_conn_status_cb_register(conn_status_callback_t *conn_status_cb);

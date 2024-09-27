@@ -15,16 +15,16 @@
 #include "ble.h"
 
 
-static bool target_device_connected[BLE_CONN_CNT] = { false };
-static bool target_device_vcp_discovered[BLE_CONN_CNT] = { false };
-static bool connect_all_targets = false;
-static bool vcp_discover_all_targets = false;
-static bool all_devices_detected = false;
-static uint8_t aics_inst_cnt[VCP_MAX_AICS_INST] = { 0 };
-static uint8_t vocs_inst_cnt[VCP_MAX_VOCS_INST] = { 0 };
-static uint8_t aics_mute[VCP_MAX_AICS_INST] = { 0 };
-static int8_t aics_gain[VCP_MAX_AICS_INST] = { 0 };
-static int16_t vocs_offset[VCP_MAX_VOCS_INST] = { 0 };
+static bool target_device_connected[BLE_CONN_CNT];
+static bool target_device_vcp_discovered[BLE_CONN_CNT];
+static bool connect_all_targets;
+static bool vcp_discover_all_targets;
+static bool all_devices_detected;
+static uint8_t aics_inst_cnt[VCP_MAX_AICS_INST];
+static uint8_t vocs_inst_cnt[VCP_MAX_VOCS_INST];
+static uint8_t aics_mute[VCP_MAX_AICS_INST];
+static int8_t aics_gain[VCP_MAX_AICS_INST];
+static int16_t vocs_offset[VCP_MAX_VOCS_INST];
 static uint8_t vcs_volume = 0;
 static uint8_t vcs_mute = 0;
 
@@ -38,11 +38,11 @@ static lv_obj_t *aics_voice_icon[VCP_MAX_AICS_INST];
 static lv_obj_t *msg_label;
 
 #if (BLE_CONN_CNT == 2)
-static bool vocs_offset_changed = false;
-static bool aics_gain_changed = false;
-static bool aics_mute_changed = false;
-static bool vcs_volume_changed = false;
-static bool vcs_mute_changed = false;
+static bool vocs_offset_changed;
+static bool aics_gain_changed;
+static bool aics_mute_changed;
+static bool vcs_volume_changed;
+static bool vcs_mute_changed;
 #endif
 
 
@@ -130,23 +130,18 @@ static void create_sliders(void)
     lv_obj_t *vocs_label[VCP_MAX_VOCS_INST];
     lv_obj_t *aics_label[VCP_MAX_AICS_INST];
     lv_coord_t scr_y = LCD_Y_MIN;
-    const int dist = (LCD_Y_MAX - LCD_Y_MIN) /
-                     (VCP_MAX_VOCS_INST + VCP_MAX_AICS_INST + 2);
+    const int dist = (LCD_Y_MAX - LCD_Y_MIN) / (VCP_MAX_VOCS_INST + VCP_MAX_AICS_INST + 2);
 
     lcd_clear_screen(scr);
 
     snprintf(txt, sizeof(txt), "Volume");
     scr_y += dist;
 
-    vcs_volume_slider = lcd_create_slider(scr,
-                                          VOLUME_MIN,
-                                          VOLUME_MAX,
-                                          10, scr_y,
+    vcs_volume_slider = lcd_create_slider(scr, VOLUME_MIN, VOLUME_MAX, 10, scr_y,
                                           vcs_volume_slider_event_cb);
 
     vcs_volume_label = lcd_create_label(scr, txt, -120, scr_y);
-    vcs_voice_icon = lcd_create_voice_icon(scr, 125, scr_y,
-                                           vcs_voice_icon_event_cb);
+    vcs_voice_icon = lcd_create_voice_icon(scr, 125, scr_y, vcs_voice_icon_event_cb);
 
     for (uint8_t i = 0; i < VCP_MAX_VOCS_INST; ++i) {
 #if (VCP_MAX_VOCS_INST == 1)
@@ -156,15 +151,11 @@ static void create_sliders(void)
 #endif
         scr_y += dist;
 
-        vocs_slider[i] = lcd_create_slider(scr,
-                                           VOCS_OFFSET_MIN,
-                                           VOCS_OFFSET_MAX,
-                                           10, scr_y,
+        vocs_slider[i] = lcd_create_slider(scr, VOCS_OFFSET_MIN, VOCS_OFFSET_MAX, 10, scr_y,
                                            vocs_slider_event_cb);
 
         vocs_label[i] = lcd_create_label(scr, txt, -120, scr_y);
-        vocs_voice_icon[i] = lcd_create_balance_icon(scr, 125, scr_y,
-                                                     NULL);
+        vocs_voice_icon[i] = lcd_create_balance_icon(scr, 125, scr_y, NULL);
     }
 
     for (uint8_t i = 0; i < VCP_MAX_AICS_INST; ++i) {
@@ -175,16 +166,11 @@ static void create_sliders(void)
 #endif
         scr_y += dist;
 
-        aics_slider[i] = lcd_create_slider(scr,
-                                           AICS_GAIN_MIN,
-                                           AICS_GAIN_MAX,
-                                           10, scr_y,
+        aics_slider[i] = lcd_create_slider(scr, AICS_GAIN_MIN, AICS_GAIN_MAX, 10, scr_y,
                                            aics_slider_event_cb);
 
         aics_label[i] = lcd_create_label(scr, txt, -120, scr_y);
-        aics_voice_icon[i] =
-            lcd_create_voice_icon(scr, 125, scr_y,
-                                  aics_voice_icon_event_cb);
+        aics_voice_icon[i] = lcd_create_voice_icon(scr, 125, scr_y, aics_voice_icon_event_cb);
     }
 }
 
@@ -248,8 +234,7 @@ static void discover_btn_event_cb(lv_event_t *e)
     int err = ble_vcp_discover(first_conn_idx);
     if (err) {
         char txt[50];
-        snprintf(txt, sizeof(txt), "Connection %d: VCP discover failed!",
-                 first_conn_idx);
+        snprintf(txt, sizeof(txt), "Connection %d: VCP discover failed!", first_conn_idx);
         lcd_display_message(msg_label, txt);
         return;
     }
@@ -264,8 +249,7 @@ static void disconnect_btn_event_cb(lv_event_t *e)
             int err = ble_disconnect(i);
             if (err) {
                 char txt[50];
-                snprintf(txt, sizeof(txt),
-                         "Connection %d: failed to disconnect!", i);
+                snprintf(txt, sizeof(txt), "Connection %d: failed to disconnect!", i);
                 lcd_display_message(msg_label, txt);
             }
         }
@@ -281,13 +265,8 @@ static void create_buttons_before_connecting(void)
 
     lcd_clear_screen(scr);
 
-    connect_btn = lcd_create_button(scr, "Connect",
-                                    100, 50, -60, -20,
-                                    connect_btn_event_cb);
-
-    scan_btn = lcd_create_button(scr, "Scan",
-                                 100, 50, 60, -20,
-                                 scan_btn_event_cb);
+    connect_btn = lcd_create_button(scr, "Connect", 100, 50, -60, -20, connect_btn_event_cb);
+    scan_btn = lcd_create_button(scr, "Scan", 100, 50, 60, -20, scan_btn_event_cb);
 
     msg_label = lcd_create_label(scr, "Not connected.", 0, 50);
 }
@@ -298,12 +277,8 @@ static void create_buttons_after_connecting(void)
 
     lcd_clear_screen(scr);
 
-    discover_btn = lcd_create_button(scr, "VCP Discover",
-                                     160, 50, 0, 0,
-                                     discover_btn_event_cb);
-
-    disconnect_btn = lcd_create_button(scr, "Disconnect",
-                                       120, 40, -75, -75, 
+    discover_btn = lcd_create_button(scr, "VCP Discover", 160, 50, 0, 0, discover_btn_event_cb);
+    disconnect_btn = lcd_create_button(scr, "Disconnect", 120, 40, -75, -75,
                                        disconnect_btn_event_cb);
 
     msg_label = lcd_create_label(scr, "Connected.", 0, 70);
@@ -355,8 +330,7 @@ static void scan_device_status(scan_status_t scan_st,
         break;
     case scan_timeout:
         printk("Some devices not found!\n");
-        lcd_display_message(msg_label,
-                            "Scan timeout!\nSome devices not found!");
+        lcd_display_message(msg_label, "Scan timeout!\nSome devices not found!");
         break;
     default:
         printk("Unknown scan status!\n");
@@ -364,8 +338,7 @@ static void scan_device_status(scan_status_t scan_st,
     }
 }
 
-static void device_connection_status(uint8_t conn_idx,
-                                     conn_status_t conn_st)
+static void device_connection_status(uint8_t conn_idx, conn_status_t conn_st)
 {
     if (conn_idx >= BLE_CONN_CNT) {
         printk("Connection index is not valid!\n");
@@ -384,8 +357,7 @@ static void device_connection_status(uint8_t conn_idx,
                     int err = connect_first_disconnected_devic(next_conn);
                     if (err) {
                         char txt[50];
-                        snprintf(txt, sizeof(txt),
-                                 "Connection %d: failed!", next_conn);
+                        snprintf(txt, sizeof(txt), "Connection %d: failed!", next_conn);
                         lcd_display_message(msg_label, txt);
                         return;
                     }
@@ -442,8 +414,7 @@ static void vcp_status(vcp_type_t cb_type, void *vcp_user_data)
         aics_inst_cnt[disc_data->conn_idx] = disc_data->aics_count;
 
         target_device_vcp_discovered[disc_data->conn_idx] = true;
-        printk("Connection %d: VCP discovered successfully\n",
-               disc_data->conn_idx);
+        printk("Connection %d: VCP discovered successfully\n", disc_data->conn_idx);
 
         if (vcp_discover_all_targets) {
             uint8_t next_conn = disc_data->conn_idx + 1;
@@ -452,8 +423,7 @@ static void vcp_status(vcp_type_t cb_type, void *vcp_user_data)
                     int err = ble_vcp_discover(next_conn);
                     if (err) {
                         char txt[50];
-                        snprintf(txt, sizeof(txt),
-                                 "Connection %d: VCP discover failed!",
+                        snprintf(txt, sizeof(txt), "Connection %d: VCP discover failed!",
                                  next_conn);
                         lcd_display_message(msg_label, txt);
                         return;
@@ -488,8 +458,7 @@ static void vcp_status(vcp_type_t cb_type, void *vcp_user_data)
                vcs_state->conn_idx, vcs_state->volume, vcs_state->mute);
 
 #if (BLE_CONN_CNT == 2)
-        next_conn_idx =
-            (vcs_state->conn_idx != conn_rshi) ? conn_rshi : conn_lshi;
+        next_conn_idx = (vcs_state->conn_idx != conn_rshi) ? conn_rshi : conn_lshi;
 
         if (vcs_volume_changed || (vcs_volume != vcs_state->volume)) {
             ble_update_volume(next_conn_idx, vcs_state->volume);
@@ -527,23 +496,18 @@ static void vcp_status(vcp_type_t cb_type, void *vcp_user_data)
         }
 
         printk("Connection %d: VOCS-%d offset = %d\n",
-               vocs_state->conn_idx, vocs_state->inst_idx,
-               vocs_state->offset);
+               vocs_state->conn_idx, vocs_state->inst_idx, vocs_state->offset);
 
 #if (BLE_CONN_CNT == 1)
         vocs_offset[vocs_state->inst_idx] = vocs_state->offset;
 #elif (BLE_CONN_CNT == 2)
-        int16_t new_offset =
-            (vocs_state->conn_idx != conn_rshi) ?
-                -(vocs_state->offset) : vocs_state->offset;
+        int16_t new_offset = (vocs_state->conn_idx != conn_rshi) ?
+                             -(vocs_state->offset) : vocs_state->offset;
 
-        next_conn_idx =
-            (vocs_state->conn_idx != conn_rshi) ? conn_rshi : conn_lshi;
+        next_conn_idx = (vocs_state->conn_idx != conn_rshi) ? conn_rshi : conn_lshi;
 
-        if (vocs_offset_changed ||
-            (vocs_offset[vocs_state->inst_idx] != new_offset)) {
-            ble_update_vocs_offset(next_conn_idx, vocs_state->inst_idx,
-                                   -(vocs_state->offset));
+        if (vocs_offset_changed || (vocs_offset[vocs_state->inst_idx] != new_offset)) {
+            ble_update_vocs_offset(next_conn_idx, vocs_state->inst_idx, -(vocs_state->offset));
             vocs_offset_changed = false;
         }
 
@@ -577,20 +541,15 @@ static void vcp_status(vcp_type_t cb_type, void *vcp_user_data)
                aics_state->gain, aics_state->mute, aics_state->mode);
 
 #if (BLE_CONN_CNT == 2)
-        next_conn_idx =
-            (aics_state->conn_idx != conn_rshi) ? conn_rshi : conn_lshi;
+        next_conn_idx = (aics_state->conn_idx != conn_rshi) ? conn_rshi : conn_lshi;
 
-        if (aics_gain_changed ||
-            (aics_gain[aics_state->inst_idx] != aics_state->gain)) {
-            ble_update_aics_gain(next_conn_idx, aics_state->inst_idx,
-                                 aics_state->gain);
+        if (aics_gain_changed || (aics_gain[aics_state->inst_idx] != aics_state->gain)) {
+            ble_update_aics_gain(next_conn_idx, aics_state->inst_idx, aics_state->gain);
             aics_gain_changed = false;
         }
 
-        if (aics_mute_changed ||
-            (aics_mute[aics_state->inst_idx] != aics_state->mute)) {
-            ble_update_aics_mute(next_conn_idx, aics_state->inst_idx,
-                                 aics_state->mute);
+        if (aics_mute_changed || (aics_mute[aics_state->inst_idx] != aics_state->mute)) {
+            ble_update_aics_mute(next_conn_idx, aics_state->inst_idx, aics_state->mute);
             aics_mute_changed = false;
         }
 #endif
