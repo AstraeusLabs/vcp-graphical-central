@@ -1,8 +1,9 @@
 /*
  * Copyright (c) 2024 Demant A/S
- *
  * SPDX-License-Identifier: Apache-2.0
  */
+
+/* Touch screen LCD display management */
 
 #include <errno.h>
 #include <stdlib.h>

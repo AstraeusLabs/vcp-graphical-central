@@ -1,8 +1,9 @@
 /*
  * Copyright (c) 2024 Demant A/S
- *
  * SPDX-License-Identifier: Apache-2.0
  */
+
+/* Header for BLE management */
 
 #ifndef __BLE_H
 #define __BLE_H

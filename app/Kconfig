@@ -1,3 +1,6 @@
+# Copyright (c) 2024 Demant A/S
+# SPDX-License-Identifier: Apache-2.0
+
 mainmenu "Bluetooth: Graphical VCP Central App"
 
 config BT_TARGET_DEVICE_NUMBER

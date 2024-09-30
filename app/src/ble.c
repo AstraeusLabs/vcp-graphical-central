@@ -1,8 +1,9 @@
 /*
  * Copyright (c) 2024 Demant A/S
- *
  * SPDX-License-Identifier: Apache-2.0
  */
+
+/* Bluetooth LE management */
 
 #include <errno.h>
 #include <stdlib.h>

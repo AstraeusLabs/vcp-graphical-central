@@ -1,8 +1,9 @@
 /*
  * Copyright (c) 2024 Demant A/S
- *
  * SPDX-License-Identifier: Apache-2.0
  */
+
+/* Header for touch screen LCD display management */
 
 #ifndef __LCD_H
 #define __LCD_H
