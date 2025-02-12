@@ -24,7 +24,7 @@ static uint8_t vocs_inst_cnt[VCP_MAX_VOCS_INST];
 static uint8_t aics_mute[VCP_MAX_AICS_INST];
 static int8_t aics_gain[VCP_MAX_AICS_INST];
 static int16_t vocs_offset[VCP_MAX_VOCS_INST];
-static uint8_t vcs_volume = 0;
+static uint8_t vcs_volume = VOLUME_DEFAULT;
 static uint8_t vcs_mute = 0;
 
 static lv_obj_t *scr;
@@ -141,6 +141,8 @@ static void create_sliders(void)
 
     vcs_volume_label = lcd_create_label(scr, txt, -120, scr_y);
     vcs_voice_icon = lcd_create_voice_icon(scr, 125, scr_y, vcs_voice_icon_event_cb);
+
+    lv_slider_set_value(vcs_volume_slider, vcs_volume, LV_ANIM_OFF);
 
     for (uint8_t i = 0; i < VCP_MAX_VOCS_INST; ++i) {
 #if (VCP_MAX_VOCS_INST == 1)
@@ -404,8 +406,14 @@ static void vcp_status(vcp_type_t cb_type, void *vcp_user_data)
         }
 
         if (disc_data->err != 0) {
-            printk("Connection %d: VCP discover get failed (%d)!\n",
+            char txt[50];
+            snprintf(txt, sizeof(txt), "Connection %d: VCP discover failed (err: %d)",
+                     disc_data->conn_idx, disc_data->err);
+            lcd_display_message(msg_label, txt);
+
+            printk("Connection %d: VCP discover get failed (err: %d)\n",
                    disc_data->conn_idx, disc_data->err);
+
             return;
         }
 
@@ -422,8 +430,8 @@ static void vcp_status(vcp_type_t cb_type, void *vcp_user_data)
                     int err = ble_vcp_discover(next_conn);
                     if (err) {
                         char txt[50];
-                        snprintf(txt, sizeof(txt), "Connection %d: VCP discover failed!",
-                                 next_conn);
+                        snprintf(txt, sizeof(txt), "Connection %d: VCP discover failed (err: %d)",
+                                 next_conn, err);
                         lcd_display_message(msg_label, txt);
                         return;
                     }

@@ -102,6 +102,12 @@ static void scan_recv_cb(const bt_addr_le_t *addr, int8_t rssi, uint8_t adv_type
                 return;
             }
 
+            for (int j = 0; j < i; j++) {
+                if (bt_addr_le_cmp(&pd_addr[j], addr) == 0) {
+                    return;
+                }
+            }
+
             ble_dev_found[i] = true;
             memcpy(&pd_addr[i], addr, sizeof(pd_addr[i]));
 
@@ -145,6 +151,7 @@ int ble_start_scan(void)
 
     for (int i = 0; i < BLE_CONN_CNT; i++) {
         ble_dev_found[i] = false;
+        memset(&pd_addr[i], 0, sizeof(pd_addr[i]));
     }
 
     err = bt_le_scan_start(&param, scan_recv_cb);

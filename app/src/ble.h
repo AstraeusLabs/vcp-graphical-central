@@ -17,6 +17,7 @@
 
 #define VOLUME_MAX              255
 #define VOLUME_MIN              0
+#define VOLUME_DEFAULT          128
 #define VOCS_OFFSET_MAX         255
 #define VOCS_OFFSET_MIN         -255
 #define AICS_GAIN_MAX           127
