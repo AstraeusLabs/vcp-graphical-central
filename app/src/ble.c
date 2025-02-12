@@ -92,6 +92,8 @@ static void scan_recv_cb(const bt_addr_le_t *addr, int8_t rssi, uint8_t adv_type
 {
     char name[MAX_DEVICE_NAME_LEN];
 
+    memset(name, 0, sizeof(name));
+
     bt_data_parse(ad, scan_data_cb, name);
 
     for (int i = 0; i < BLE_CONN_CNT; i++) {
